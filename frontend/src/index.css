@@ -1,14 +1,32 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   /* The UI only has a light palette right now — declaring "light dark"
      here would let the browser auto-flip default text/background colors
      in dark mode, which breaks contrast on elements that don't set an
      explicit color (e.g. it previously made button text invisible). */
   color-scheme: light;
-  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
-  color: #1f2328;
+  font:
+    16px/1.5 'Inter',
+    system-ui,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: #201c18;
 }
 
 body {
   margin: 0;
-  background: #ffffff;
+  /* A tasteful off-white (rather than stark white) so white card surfaces
+     read with a touch of depth/contrast without needing shadows. */
+  background: #f7f5f2;
+}
+
+::selection {
+  background: #13737a;
+  color: #ffffff;
 }
