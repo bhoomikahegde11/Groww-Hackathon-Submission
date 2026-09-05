@@ -2,13 +2,53 @@ import { useEffect, useState, type FormEvent } from 'react'
 import './App.css'
 import {
   addWatchlistItem,
+  fetchQuotes,
   fetchWatchlist,
   removeWatchlistItem,
+  type QuoteResult,
   type WatchlistItem,
 } from './api'
 
+function formatNumber(n: number): string {
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 2 })
+}
+
+function formatVolume(n: number): string {
+  return n.toLocaleString('en-IN')
+}
+
+function QuoteDetails({ result }: { result: QuoteResult | undefined }) {
+  if (!result) return <p className="quote-status">Loading market data…</p>
+  if (!result.found) {
+    return <p className="quote-status">No simulated market data for this symbol.</p>
+  }
+
+  const { quote } = result
+  const change = quote.lastPrice - quote.previousClose
+  const changePct = (change / quote.previousClose) * 100
+  const isUp = change >= 0
+
+  return (
+    <div className="quote">
+      <div className="quote-main">
+        <span className="price">₹{formatNumber(quote.lastPrice)}</span>
+        <span className={isUp ? 'change up' : 'change down'}>
+          {isUp ? '▲' : '▼'} {formatNumber(Math.abs(change))} (
+          {isUp ? '+' : ''}
+          {changePct.toFixed(2)}%)
+        </span>
+      </div>
+      <div className="quote-details">
+        <span>Day range: ₹{formatNumber(quote.dayLow)} – ₹{formatNumber(quote.dayHigh)}</span>
+        <span>Volume: {formatVolume(quote.volume)}</span>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [items, setItems] = useState<WatchlistItem[]>([])
+  const [quotes, setQuotes] = useState<Record<string, QuoteResult>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -17,9 +57,23 @@ function App() {
   const [submitting, setSubmitting] = useState(false)
   const [removingSymbol, setRemovingSymbol] = useState<string | null>(null)
 
+  async function refreshQuotes() {
+    try {
+      const results = await fetchQuotes()
+      const map: Record<string, QuoteResult> = {}
+      for (const result of results) map[result.symbol] = result
+      setQuotes(map)
+    } catch {
+      // Watchlist still works without market data; leave existing quotes as-is.
+    }
+  }
+
   useEffect(() => {
     fetchWatchlist()
-      .then((watchlist) => setItems(watchlist.items))
+      .then((watchlist) => {
+        setItems(watchlist.items)
+        return refreshQuotes()
+      })
       .catch((err) => setLoadError(err.message))
       .finally(() => setLoading(false))
   }, [])
@@ -35,6 +89,7 @@ function App() {
       const item = await addWatchlistItem(symbol)
       setItems((prev) => [...prev, item])
       setSymbolInput('')
+      await refreshQuotes()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to add symbol')
     } finally {
@@ -47,6 +102,11 @@ function App() {
     try {
       await removeWatchlistItem(symbol)
       setItems((prev) => prev.filter((item) => item.symbol !== symbol))
+      setQuotes((prev) => {
+        const next = { ...prev }
+        delete next[symbol]
+        return next
+      })
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to remove symbol')
     } finally {
@@ -57,13 +117,16 @@ function App() {
   return (
     <main className="app">
       <h1>Smart Market Watchlist</h1>
+      <p className="disclaimer">
+        Market data shown is simulated for demo purposes — not real prices.
+      </p>
 
       <form className="add-form" onSubmit={handleAdd}>
         <input
           type="text"
           value={symbolInput}
           onChange={(e) => setSymbolInput(e.target.value)}
-          placeholder="Add a symbol, e.g. AAPL"
+          placeholder="Add a symbol, e.g. TCS"
           maxLength={10}
           disabled={submitting}
         />
@@ -81,19 +144,29 @@ function App() {
         <p className="empty">Your watchlist is empty. Add a symbol above.</p>
       ) : (
         <ul className="watchlist">
-          {items.map((item) => (
-            <li key={item.id}>
-              <span className="symbol">{item.symbol}</span>
-              <button
-                type="button"
-                className="remove"
-                onClick={() => handleRemove(item.symbol)}
-                disabled={removingSymbol === item.symbol}
-              >
-                {removingSymbol === item.symbol ? 'Removing…' : 'Remove'}
-              </button>
-            </li>
-          ))}
+          {items.map((item) => {
+            const result = quotes[item.symbol]
+            const name = result?.found ? result.quote.name : null
+            return (
+              <li key={item.id}>
+                <div className="row">
+                  <div className="identity">
+                    <span className="symbol">{item.symbol}</span>
+                    {name && <span className="company-name">{name}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="remove"
+                    onClick={() => handleRemove(item.symbol)}
+                    disabled={removingSymbol === item.symbol}
+                  >
+                    {removingSymbol === item.symbol ? 'Removing…' : 'Remove'}
+                  </button>
+                </div>
+                <QuoteDetails result={result} />
+              </li>
+            )
+          })}
         </ul>
       )}
     </main>

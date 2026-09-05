@@ -6,7 +6,7 @@ Built for the Groww CODE 2026 hackathon.
 
 ## Status
 
-Core loop works end-to-end: add/view/remove stock symbols on a persistent watchlist (frontend → API → SQLite → API → frontend). There's still no authentication — everything operates on a single placeholder user. Market data integration and change-detection logic are not implemented yet — that's next.
+Core loop works end-to-end: add/view/remove stock symbols on a persistent watchlist, each shown with simulated market data (frontend → API → SQLite/`MarketDataProvider` → API → frontend). There's still no authentication — everything operates on a single placeholder user. Change-detection logic and a real market-data integration are not implemented yet — that's next.
 
 ## Stack
 
@@ -79,5 +79,16 @@ With both running, open http://localhost:5173 to add, view, and remove watchlist
   - `400` invalid symbol, `409` symbol already on the watchlist
 - `DELETE /api/watchlist/items/:symbol` — remove a symbol
   - `404` if the symbol isn't on the watchlist
+- `GET /api/market/quotes` — simulated market data for the watchlist's symbols (see below)
 
 Symbols are normalized to uppercase and must match `1-10` characters: letters, digits, `.` or `-`, starting with a letter.
+
+## Market data
+
+Backend market data is served through a `MarketDataProvider` interface (`backend/src/marketData/types.ts`), so the rest of the app depends on that contract rather than a specific data source. The only implementation right now is `MockMarketDataProvider` — no external API, no cost.
+
+Quotes are **deterministic**: each symbol's price/volume are derived from fixed seed data (`seedStocks.ts`) plus a scenario profile (`scenarios.ts`, e.g. `normal`, `significant-move`, `high-volume`, `52w-high-cross`) using a seeded PRNG (`rng.ts`) keyed by the symbol. Same symbol -> same simulated quote every time, not a new random value per request. Swapping in a real provider later means writing one class that implements `MarketDataProvider` and pointing `marketData/index.ts` at it.
+
+Seeded symbols: `TCS`, `INFY`, `RELIANCE`, `HDFCBANK`, `ICICIBANK`. Any other symbol on the watchlist is accepted but returns `"found": false` in the quotes response instead of erroring.
+
+The frontend clearly labels this data as simulated.

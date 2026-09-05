@@ -2,6 +2,7 @@ import "dotenv/config";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { healthRouter } from "./routes/health";
+import { marketRouter } from "./routes/market";
 import { watchlistRouter } from "./routes/watchlist";
 
 const app = express();
@@ -12,6 +13,7 @@ app.use(express.json());
 
 app.use("/api/health", healthRouter);
 app.use("/api/watchlist", watchlistRouter);
+app.use("/api/market", marketRouter);
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(error);

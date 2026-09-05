@@ -12,6 +12,24 @@ export type Watchlist = {
   items: WatchlistItem[]
 }
 
+export type Quote = {
+  symbol: string
+  name: string
+  lastPrice: number
+  previousClose: number
+  open: number
+  dayHigh: number
+  dayLow: number
+  volume: number
+  weekHigh52: number
+  weekLow52: number
+  asOf: string
+}
+
+export type QuoteResult =
+  | { symbol: string; found: true; quote: Quote }
+  | { symbol: string; found: false }
+
 async function parseErrorMessage(res: Response): Promise<string> {
   try {
     const body = await res.json()
@@ -44,4 +62,11 @@ export async function removeWatchlistItem(symbol: string): Promise<void> {
     { method: 'DELETE' },
   )
   if (!res.ok && res.status !== 204) throw new Error(await parseErrorMessage(res))
+}
+
+export async function fetchQuotes(): Promise<QuoteResult[]> {
+  const res = await fetch(`${API_BASE_URL}/api/market/quotes`)
+  if (!res.ok) throw new Error(await parseErrorMessage(res))
+  const body = await res.json()
+  return body.quotes
 }
