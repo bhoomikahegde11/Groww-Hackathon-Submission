@@ -91,16 +91,27 @@ h1 {
 }
 
 .remove {
-  padding: 0.3rem 0.7rem;
+  padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
+  font-weight: 500;
   border: 1px solid #d0d7de;
   border-radius: 6px;
-  background: white;
+  background: #ffffff;
+  color: #cf222e;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.remove:hover:not(:disabled) {
+  background: #cf222e;
+  color: #ffffff;
+  border-color: #cf222e;
 }
 
 .remove:disabled {
+  background: #f6f8fa;
   color: #8b949e;
+  border-color: #d0d7de;
   cursor: not-allowed;
 }
 
@@ -144,6 +155,104 @@ h1 {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
   color: #57606a;
+}
+
+.away-banner {
+  background: #ddf4ff;
+  border: 1px solid #54aeff;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.away-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.away-header h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.15rem;
+}
+
+.away-count {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #0969da;
+  font-weight: 500;
+}
+
+.ack-button {
+  flex-shrink: 0;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid #0969da;
+  border-radius: 6px;
+  background: #0969da;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.ack-button:hover {
+  background: #0757ba;
+  border-color: #0757ba;
+}
+
+.change-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.change-list li {
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.change-symbol {
+  font-weight: 600;
+}
+
+.change-pct {
+  font-weight: 600;
+}
+
+.change-pct.up {
+  color: #1a7f37;
+}
+
+.change-pct.down {
+  color: #cf222e;
+}
+
+.change-reason {
+  color: #57606a;
+}
+
+.last-checked {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  color: #57606a;
+}
+
+.since-last-visit {
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.since-label {
+  font-weight: 600;
+}
+
+.since-changes {
+  color: #24292f;
 }
 
 .empty {

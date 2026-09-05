@@ -70,3 +70,39 @@ export async function fetchQuotes(): Promise<QuoteResult[]> {
   const body = await res.json()
   return body.quotes
 }
+
+export type SnapshotChange = {
+  symbol: string
+  name: string
+  changePercent: number
+  primaryLabel: string
+  labels: string[]
+}
+
+export type SnapshotView =
+  | { kind: 'first-visit' }
+  | { kind: 'no-changes' }
+  | {
+      kind: 'while-you-were-away'
+      comparedAt: string
+      previousCheckedAt: string | null
+      changes: SnapshotChange[]
+    }
+  | {
+      kind: 'since-last-visit'
+      comparedAt: string
+      changes: SnapshotChange[]
+    }
+
+export async function fetchSnapshot(): Promise<SnapshotView> {
+  const res = await fetch(`${API_BASE_URL}/api/market/snapshot`)
+  if (!res.ok) throw new Error(await parseErrorMessage(res))
+  return res.json()
+}
+
+export async function acknowledgeSnapshot(): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/market/snapshot/ack`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error(await parseErrorMessage(res))
+}

@@ -18,12 +18,13 @@ model User {
 }
 
 model Watchlist {
-  id        String          @id @default(cuid())
+  id        String              @id @default(cuid())
   name      String
   userId    String
-  user      User            @relation(fields: [userId], references: [id])
+  user      User                @relation(fields: [userId], references: [id])
   items     WatchlistItem[]
-  createdAt DateTime        @default(now())
+  snapshot  WatchlistSnapshot?
+  createdAt DateTime            @default(now())
 }
 
 model WatchlistItem {
@@ -33,5 +34,27 @@ model WatchlistItem {
   symbol      String
   addedAt     DateTime  @default(now())
 
+  // Market state as of the user's last acknowledged visit, used to detect
+  // meaningful changes on their next visit. Null until first acknowledged.
+  lastSeenPrice      Float?
+  lastSeenVolume     Int?
+  lastSeenWeekHigh52 Float?
+  lastSeenWeekLow52  Float?
+  lastSeenAt         DateTime?
+
   @@unique([watchlistId, symbol])
+}
+
+// At most one snapshot per watchlist: the most recently detected set of
+// "while you were away" changes, and whether the user has acknowledged it.
+// This is not a historical log — it is overwritten on each new comparison.
+model WatchlistSnapshot {
+  id             String    @id @default(cuid())
+  watchlistId    String    @unique
+  watchlist      Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  comparedAt     DateTime  @default(now())
+  // JSON-serialized { items: ItemSnapshot[]; changes: ItemChangeSummary[] }
+  payload        String
+  acknowledged   Boolean   @default(false)
+  acknowledgedAt DateTime?
 }

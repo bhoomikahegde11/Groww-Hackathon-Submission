@@ -6,7 +6,7 @@ Built for the Groww CODE 2026 hackathon.
 
 ## Status
 
-Core loop works end-to-end: add/view/remove stock symbols on a persistent watchlist, each shown with simulated market data (frontend → API → SQLite/`MarketDataProvider` → API → frontend). There's still no authentication — everything operates on a single placeholder user. Change-detection logic and a real market-data integration are not implemented yet — that's next.
+Core loop works end-to-end: add/view/remove stock symbols on a persistent watchlist, each shown with simulated market data, plus a "while you were away" summary of meaningful changes since the user's last visit. There's still no authentication — everything operates on a single placeholder user. A real market-data integration is not implemented yet — that's next.
 
 ## Stack
 
@@ -53,6 +53,7 @@ With both running, open http://localhost:5173 to add, view, and remove watchlist
 | `npm run dev` | Run the API with hot reload |
 | `npm run build` / `npm start` | Compile and run the production build |
 | `npm run typecheck` | Type-check without emitting |
+| `npm test` | Run change-detection unit tests |
 | `npm run prisma:migrate` | Apply Prisma migrations to the local SQLite DB |
 | `npm run prisma:studio` | Open Prisma Studio to browse data |
 
@@ -69,7 +70,8 @@ With both running, open http://localhost:5173 to add, view, and remove watchlist
 
 - `User` — placeholder owner of watchlists (no auth yet)
 - `Watchlist` — a named list belonging to a user
-- `WatchlistItem` — a stock symbol on a watchlist (unique per watchlist)
+- `WatchlistItem` — a stock symbol on a watchlist (unique per watchlist), plus its `lastSeen*` fields (price, volume, 52-week high/low, timestamp) — the baseline used to detect what changed since the user's last visit
+- `WatchlistSnapshot` — at most one per watchlist: the most recently detected set of changes and whether the user has acknowledged it (not a historical log — overwritten on each new comparison)
 
 ## API
 
@@ -80,6 +82,8 @@ With both running, open http://localhost:5173 to add, view, and remove watchlist
 - `DELETE /api/watchlist/items/:symbol` — remove a symbol
   - `404` if the symbol isn't on the watchlist
 - `GET /api/market/quotes` — simulated market data for the watchlist's symbols (see below)
+- `GET /api/market/snapshot` — the "while you were away" comparison (see below)
+- `POST /api/market/snapshot/ack` — acknowledge the current pending snapshot
 
 Symbols are normalized to uppercase and must match `1-10` characters: letters, digits, `.` or `-`, starting with a letter.
 
@@ -92,3 +96,15 @@ Quotes are **deterministic**: each symbol's price/volume are derived from fixed 
 Seeded symbols: `TCS`, `INFY`, `RELIANCE`, `HDFCBANK`, `ICICIBANK`. Any other symbol on the watchlist is accepted but returns `"found": false` in the quotes response instead of erroring.
 
 The frontend clearly labels this data as simulated.
+
+## "While you were away"
+
+`backend/src/marketData/changeDetection.ts` holds the pure, unit-tested rules for what counts as a "meaningful" change (see `backend/src/marketData/changeDetection.test.ts`), kept separate from routes/persistence so the rules can be tuned independently:
+
+- price moved ≥3% since the user's last-seen price ("significant price movement")
+- today's 52-week high/low exceeds what was last seen ("new 52-week high/low")
+- volume is ≥2x the last-seen volume ("unusual volume")
+
+`backend/src/lib/snapshotService.ts` orchestrates persistence: `GET /api/market/snapshot` returns one of `first-visit` (no baseline yet — a new item silently starts tracking from now, without showing a banner), `no-changes`, `while-you-were-away` (a pending, unacknowledged comparison — stable across repeated calls until acknowledged, so refreshing never fabricates a new event), or `since-last-visit` (a compact readout of the last comparison that *was* acknowledged). `POST /api/market/snapshot/ack` is idempotent and, in a single transaction, advances every item's baseline to the exact values captured when the snapshot was created (not freshly re-fetched quotes), so a duplicate acknowledgement (e.g. the "Got it" click racing the automatic viewport acknowledgement) can't corrupt the baseline.
+
+On the frontend, the banner acknowledges either via its "Got it" button or automatically once `IntersectionObserver` reports it's been in view for ~1.5s — whichever comes first. Closing the tab before that window elapses leaves the snapshot pending, so it's shown again next visit.

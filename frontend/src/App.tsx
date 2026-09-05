@@ -1,13 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import './App.css'
 import {
+  acknowledgeSnapshot,
   addWatchlistItem,
   fetchQuotes,
+  fetchSnapshot,
   fetchWatchlist,
   removeWatchlistItem,
   type QuoteResult,
+  type SnapshotView,
   type WatchlistItem,
 } from './api'
+import { WhileYouWereAway } from './WhileYouWereAway'
 
 function formatNumber(n: number): string {
   return n.toLocaleString('en-IN', { maximumFractionDigits: 2 })
@@ -49,6 +53,7 @@ function QuoteDetails({ result }: { result: QuoteResult | undefined }) {
 function App() {
   const [items, setItems] = useState<WatchlistItem[]>([])
   const [quotes, setQuotes] = useState<Record<string, QuoteResult>>({})
+  const [snapshot, setSnapshot] = useState<SnapshotView | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -68,11 +73,27 @@ function App() {
     }
   }
 
+  async function refreshSnapshot() {
+    try {
+      setSnapshot(await fetchSnapshot())
+    } catch {
+      // The "while you were away" summary is a bonus; the watchlist works without it.
+    }
+  }
+
+  async function handleAcknowledge() {
+    try {
+      await acknowledgeSnapshot()
+    } finally {
+      await refreshSnapshot()
+    }
+  }
+
   useEffect(() => {
     fetchWatchlist()
       .then((watchlist) => {
         setItems(watchlist.items)
-        return refreshQuotes()
+        return Promise.all([refreshQuotes(), refreshSnapshot()])
       })
       .catch((err) => setLoadError(err.message))
       .finally(() => setLoading(false))
@@ -120,6 +141,10 @@ function App() {
       <p className="disclaimer">
         Market data shown is simulated for demo purposes — not real prices.
       </p>
+
+      {snapshot && (
+        <WhileYouWereAway snapshot={snapshot} onAcknowledge={handleAcknowledge} />
+      )}
 
       <form className="add-form" onSubmit={handleAdd}>
         <input
