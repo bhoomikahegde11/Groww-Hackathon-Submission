@@ -1,11 +1,12 @@
 import type { WatchlistItem } from "@prisma/client";
+import { rankChangesByAttention } from "../marketData/attentionScoring";
 import {
   detectWatchlistChanges,
   type ItemChangeSummary,
   type ItemComparisonInput,
 } from "../marketData/changeDetection";
 import { marketDataProvider } from "../marketData";
-import type { Quote } from "../marketData";
+import type { MarketDataQueryOptions, Quote } from "../marketData";
 import { prisma } from "./prisma";
 
 interface StoredItemState {
@@ -54,8 +55,11 @@ function toPublicChange(change: ItemChangeSummary): PublicChange {
   };
 }
 
-async function fetchQuoteMap(symbols: string[]): Promise<Map<string, Quote>> {
-  const results = await marketDataProvider.getQuotes(symbols);
+async function fetchQuoteMap(
+  symbols: string[],
+  options?: MarketDataQueryOptions,
+): Promise<Map<string, Quote>> {
+  const results = await marketDataProvider.getQuotes(symbols, options);
   const map = new Map<string, Quote>();
   for (const result of results) {
     if (result.found) map.set(result.symbol, result.quote);
@@ -95,10 +99,16 @@ async function initializeMissingBaselines(
   );
 }
 
-export async function getSnapshotView(watchlistId: string): Promise<SnapshotView> {
+export async function getSnapshotView(
+  watchlistId: string,
+  options?: MarketDataQueryOptions,
+): Promise<SnapshotView> {
   const items = await prisma.watchlistItem.findMany({ where: { watchlistId } });
   const hadAnyBaseline = items.some((item) => item.lastSeenAt !== null);
-  const quotes = await fetchQuoteMap(items.map((item) => item.symbol));
+  const quotes = await fetchQuoteMap(
+    items.map((item) => item.symbol),
+    options,
+  );
 
   await initializeMissingBaselines(items, quotes);
 
@@ -144,7 +154,12 @@ export async function getSnapshotView(watchlistId: string): Promise<SnapshotView
         : null,
     }));
 
-  const changes = detectWatchlistChanges(comparisonInputs);
+  // Rank by explainable attention score before this ordering is persisted
+  // or returned — detection decides *what* is meaningful, scoring decides
+  // *how much attention* it deserves.
+  const changes = rankChangesByAttention(detectWatchlistChanges(comparisonInputs)).map(
+    (ranked) => ranked.change,
+  );
 
   if (changes.length === 0) {
     if (existing) {

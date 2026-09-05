@@ -6,4 +6,9 @@ import type { MarketDataProvider } from "./types";
 // since callers only depend on the MarketDataProvider interface.
 export const marketDataProvider: MarketDataProvider = new MockMarketDataProvider();
 
-export type { MarketDataProvider, Quote, QuoteResult } from "./types";
+export type {
+  MarketDataProvider,
+  MarketDataQueryOptions,
+  Quote,
+  QuoteResult,
+} from "./types";

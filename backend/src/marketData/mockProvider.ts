@@ -1,7 +1,12 @@
 import { createRng } from "./rng";
-import { SCENARIOS } from "./scenarios";
+import { SCENARIOS, type Scenario } from "./scenarios";
 import { STOCK_SEEDS, type StockSeed } from "./seedStocks";
-import type { MarketDataProvider, Quote, QuoteResult } from "./types";
+import type {
+  MarketDataProvider,
+  MarketDataQueryOptions,
+  Quote,
+  QuoteResult,
+} from "./types";
 
 const SEED_BY_SYMBOL = new Map(STOCK_SEEDS.map((seed) => [seed.symbol, seed]));
 
@@ -9,9 +14,10 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function buildQuote(seed: StockSeed): Quote {
+function buildQuote(seed: StockSeed, scenarioOverride?: Scenario): Quote {
   const rng = createRng(seed.symbol);
-  const profile = SCENARIOS[seed.scenario];
+  const scenario = scenarioOverride ?? seed.scenario;
+  const profile = SCENARIOS[scenario];
 
   const [minChange, maxChange] = profile.changeRange;
   const changePct = minChange + rng() * (maxChange - minChange);
@@ -67,11 +73,14 @@ function buildQuote(seed: StockSeed): Quote {
  * symbol return the same market state instead of drifting randomly.
  */
 export class MockMarketDataProvider implements MarketDataProvider {
-  async getQuotes(symbols: string[]): Promise<QuoteResult[]> {
+  async getQuotes(
+    symbols: string[],
+    options?: MarketDataQueryOptions,
+  ): Promise<QuoteResult[]> {
     return symbols.map((symbol) => {
       const seed = SEED_BY_SYMBOL.get(symbol);
       if (!seed) return { symbol, found: false };
-      return { symbol, found: true, quote: buildQuote(seed) };
+      return { symbol, found: true, quote: buildQuote(seed, options?.scenario) };
     });
   }
 }

@@ -205,15 +205,27 @@ h1 {
   list-style: none;
   margin: 0.6rem 0 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.change-list li {
-  padding: 0.25rem 0;
-  font-size: 0.9rem;
+.change-card {
+  background: #ffffff;
+  border: 1px solid #b6e3ff;
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+}
+
+.change-card-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .change-symbol {
   font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .change-pct {
@@ -228,8 +240,27 @@ h1 {
   color: #cf222e;
 }
 
-.change-reason {
+.change-name {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
   color: #57606a;
+}
+
+.change-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.change-label-pill {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #0969da;
+  background: #ddf4ff;
+  border: 1px solid #b6e3ff;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
 }
 
 .last-checked {
@@ -262,4 +293,46 @@ h1 {
 .error {
   color: #cf222e;
   font-weight: 500;
+}
+
+.dev-preview {
+  margin-top: 2rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed #d4a72c;
+  border-radius: 8px;
+  background: #fffdf5;
+}
+
+.dev-preview-label {
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  color: #9a6700;
+}
+
+.dev-preview-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dev-preview-buttons button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border: 1px solid #d4a72c;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #9a6700;
+  cursor: pointer;
+}
+
+.dev-preview-buttons button:disabled {
+  color: #b3a58a;
+  cursor: not-allowed;
+}
+
+.dev-preview-active {
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9a6700;
 }

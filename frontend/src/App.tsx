@@ -11,6 +11,7 @@ import {
   type SnapshotView,
   type WatchlistItem,
 } from './api'
+import { DevScenarioPreview } from './DevScenarioPreview'
 import { WhileYouWereAway } from './WhileYouWereAway'
 
 function formatNumber(n: number): string {
@@ -84,6 +85,14 @@ function App() {
   async function handleAcknowledge() {
     try {
       await acknowledgeSnapshot()
+      setFormError(null)
+    } catch (err) {
+      setFormError(
+        err instanceof Error
+          ? `Could not save that you've seen these changes: ${err.message}`
+          : "Could not save that you've seen these changes.",
+      )
+      throw err
     } finally {
       await refreshSnapshot()
     }
@@ -194,6 +203,8 @@ function App() {
           })}
         </ul>
       )}
+
+      {import.meta.env.DEV && <DevScenarioPreview />}
     </main>
   )
 }

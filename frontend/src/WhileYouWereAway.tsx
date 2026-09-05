@@ -24,15 +24,26 @@ function formatCheckedAt(iso: string): string {
   return `${day} at ${time}`
 }
 
-function ChangeLine({ change }: { change: SnapshotChange }) {
+function ChangeCard({ change }: { change: SnapshotChange }) {
   const isUp = change.changePercent >= 0
+  const showName = change.name && change.name !== change.symbol
+
   return (
-    <li>
-      <span className="change-symbol">{change.symbol}</span>{' '}
-      <span className={isUp ? 'change-pct up' : 'change-pct down'}>
-        {formatPercent(change.changePercent)}
-      </span>{' '}
-      <span className="change-reason">— {change.primaryLabel}</span>
+    <li className="change-card">
+      <div className="change-card-main">
+        <span className="change-symbol">{change.symbol}</span>
+        <span className={isUp ? 'change-pct up' : 'change-pct down'}>
+          {formatPercent(change.changePercent)}
+        </span>
+      </div>
+      {showName && <p className="change-name">{change.name}</p>}
+      <div className="change-labels">
+        {change.labels.map((label) => (
+          <span key={label} className="change-label-pill">
+            {label}
+          </span>
+        ))}
+      </div>
     </li>
   )
 }
@@ -40,9 +51,12 @@ function ChangeLine({ change }: { change: SnapshotChange }) {
 export function WhileYouWereAway({
   snapshot,
   onAcknowledge,
+  autoAcknowledge = true,
 }: {
   snapshot: SnapshotView
-  onAcknowledge: () => void
+  onAcknowledge: () => void | Promise<void>
+  /** Set to false to disable the viewport-based auto-acknowledge timer (e.g. for previews/demos). Defaults to true (production behavior). */
+  autoAcknowledge?: boolean
 }) {
   const bannerRef = useRef<HTMLDivElement>(null)
   const acknowledgedRef = useRef(false)
@@ -50,10 +64,16 @@ export function WhileYouWereAway({
   function acknowledgeOnce() {
     if (acknowledgedRef.current) return
     acknowledgedRef.current = true
-    onAcknowledge()
+    Promise.resolve(onAcknowledge()).catch(() => {
+      // The request failed (e.g. a transient network error) — un-stick the
+      // guard so the "Got it" button (or the next viewport intersection)
+      // can retry, instead of silently becoming permanently inert.
+      acknowledgedRef.current = false
+    })
   }
 
   useEffect(() => {
+    if (!autoAcknowledge) return
     if (snapshot.kind !== 'while-you-were-away') return
     const el = bannerRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return
@@ -83,7 +103,7 @@ export function WhileYouWereAway({
       observer.disconnect()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot])
+  }, [snapshot, autoAcknowledge])
 
   if (snapshot.kind === 'while-you-were-away') {
     return (
@@ -102,7 +122,7 @@ export function WhileYouWereAway({
         </div>
         <ul className="change-list">
           {snapshot.changes.map((change) => (
-            <ChangeLine key={change.symbol} change={change} />
+            <ChangeCard key={change.symbol} change={change} />
           ))}
         </ul>
         {snapshot.previousCheckedAt && (

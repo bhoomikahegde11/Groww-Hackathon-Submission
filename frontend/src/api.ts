@@ -106,3 +106,28 @@ export async function acknowledgeSnapshot(): Promise<void> {
   })
   if (!res.ok) throw new Error(await parseErrorMessage(res))
 }
+
+export type ScenarioName =
+  | 'normal'
+  | 'significant-move'
+  | 'high-volume'
+  | '52w-high-cross'
+  | '52w-low-cross'
+
+export interface SnapshotPreview {
+  scenario: ScenarioName
+  changes: SnapshotChange[]
+}
+
+// Dev-only manual testing helper: read-only preview of the "while you were
+// away" summary under a given simulator scenario. Never touches the real
+// snapshot/baseline state (see backend GET /api/market/snapshot/preview).
+export async function fetchSnapshotPreview(
+  scenario: ScenarioName,
+): Promise<SnapshotPreview> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/market/snapshot/preview?scenario=${encodeURIComponent(scenario)}`,
+  )
+  if (!res.ok) throw new Error(await parseErrorMessage(res))
+  return res.json()
+}
