@@ -1,0 +1,37 @@
+// Prisma schema for the Smart Market Watchlist backend.
+// No authentication yet: User exists as a placeholder owner for watchlists.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(cuid())
+  name       String
+  createdAt  DateTime    @default(now())
+  watchlists Watchlist[]
+}
+
+model Watchlist {
+  id        String          @id @default(cuid())
+  name      String
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  items     WatchlistItem[]
+  createdAt DateTime        @default(now())
+}
+
+model WatchlistItem {
+  id          String    @id @default(cuid())
+  watchlistId String
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  symbol      String
+  addedAt     DateTime  @default(now())
+
+  @@unique([watchlistId, symbol])
+}
