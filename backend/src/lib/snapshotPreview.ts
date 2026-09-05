@@ -4,7 +4,7 @@ import {
   type ItemComparisonInput,
 } from "../marketData/changeDetection";
 import { marketDataProvider } from "../marketData";
-import type { MarketDataQueryOptions } from "../marketData";
+import type { MarketDataQueryOptions, QuoteResult } from "../marketData";
 import { prisma } from "./prisma";
 
 export interface PreviewChange {
@@ -31,10 +31,18 @@ export async function getSnapshotPreview(
 ): Promise<PreviewChange[]> {
   const items = await prisma.watchlistItem.findMany({ where: { watchlistId } });
 
-  const results = await marketDataProvider.getQuotes(
-    items.map((item) => item.symbol),
-    options,
-  );
+  let results: QuoteResult[];
+  try {
+    results = await marketDataProvider.getQuotes(
+      items.map((item) => item.symbol),
+      options,
+    );
+  } catch {
+    // Provider unavailable this call — same safe degrade as snapshotService:
+    // every symbol is treated as having no current data, so nothing is
+    // (falsely) flagged as changed.
+    results = [];
+  }
   const quotes = new Map(
     results.filter((r) => r.found).map((r) => [r.symbol, r.quote]),
   );

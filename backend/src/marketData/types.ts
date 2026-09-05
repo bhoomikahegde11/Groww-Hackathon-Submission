@@ -26,6 +26,20 @@ export interface MarketDataQueryOptions {
    * provider implementation is free to ignore it.
    */
   scenario?: Scenario;
+  /**
+   * Dev/testing only: forces getQuotes to reject entirely, simulating a
+   * complete market-data provider outage. Deterministic (only happens when
+   * explicitly set) — never triggers on its own. A real provider
+   * implementation is free to ignore this.
+   */
+  simulateProviderFailure?: boolean;
+  /**
+   * Dev/testing only: forces these specific symbols to come back as
+   * `found: false`, simulating a partial/per-symbol data failure even for
+   * otherwise-valid symbols. A real provider implementation is free to
+   * ignore this.
+   */
+  failSymbols?: string[];
 }
 
 /**

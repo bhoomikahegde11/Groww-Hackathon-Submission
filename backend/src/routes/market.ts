@@ -18,6 +18,16 @@ marketRouter.get(
       return;
     }
 
+    // Dev/testing only: lets a developer manually trigger a complete
+    // provider outage or specific per-symbol failures from the browser,
+    // without ever happening on a normal request. See MockMarketDataProvider.
+    const simulateProviderFailure = req.query.simulateProviderFailure === "true";
+    const failSymbolsParam = req.query.failSymbols;
+    const failSymbols =
+      typeof failSymbolsParam === "string"
+        ? failSymbolsParam.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : undefined;
+
     const watchlist = await getDefaultWatchlist();
     const items = await prisma.watchlistItem.findMany({
       where: { watchlistId: watchlist.id },
@@ -25,9 +35,21 @@ marketRouter.get(
     });
 
     const symbols = items.map((item) => item.symbol);
-    const quotes = await marketDataProvider.getQuotes(symbols, {
-      scenario: parsedScenario.scenario,
-    });
+
+    let quotes;
+    try {
+      quotes = await marketDataProvider.getQuotes(symbols, {
+        scenario: parsedScenario.scenario,
+        simulateProviderFailure,
+        failSymbols,
+      });
+    } catch {
+      res.status(503).json({
+        error: "Market data provider is currently unavailable.",
+        quotes: [],
+      });
+      return;
+    }
 
     res.json({ quotes });
   }),

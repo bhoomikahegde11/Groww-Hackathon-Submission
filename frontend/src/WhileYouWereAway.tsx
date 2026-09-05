@@ -29,7 +29,7 @@ function ChangeCard({ change }: { change: SnapshotChange }) {
   const showName = change.name && change.name !== change.symbol
 
   return (
-    <li className="change-card">
+    <li className={isUp ? 'change-card up' : 'change-card down'}>
       <div className="change-card-main">
         <span className="change-symbol">{change.symbol}</span>
         <span className={isUp ? 'change-pct up' : 'change-pct down'}>

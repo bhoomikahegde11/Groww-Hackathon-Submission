@@ -77,7 +77,14 @@ export class MockMarketDataProvider implements MarketDataProvider {
     symbols: string[],
     options?: MarketDataQueryOptions,
   ): Promise<QuoteResult[]> {
+    if (options?.simulateProviderFailure) {
+      throw new Error("Simulated market data provider failure");
+    }
+
+    const failSymbols = new Set(options?.failSymbols ?? []);
+
     return symbols.map((symbol) => {
+      if (failSymbols.has(symbol)) return { symbol, found: false };
       const seed = SEED_BY_SYMBOL.get(symbol);
       if (!seed) return { symbol, found: false };
       return { symbol, found: true, quote: buildQuote(seed, options?.scenario) };

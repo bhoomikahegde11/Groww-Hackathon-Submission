@@ -86,3 +86,56 @@ test("an unsupported symbol is still reported as not found regardless of scenari
   });
   assert.equal(result.found, false);
 });
+
+test("simulateProviderFailure rejects the whole call, simulating a complete outage", async () => {
+  const provider = new MockMarketDataProvider();
+  await assert.rejects(() =>
+    provider.getQuotes(["TCS", "INFY"], { simulateProviderFailure: true }),
+  );
+});
+
+test("normal requests are unaffected when simulateProviderFailure is not set", async () => {
+  const provider = new MockMarketDataProvider();
+  const results = await provider.getQuotes(["TCS"]);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].found, true);
+});
+
+test("failSymbols forces only the named symbols to come back as not found", async () => {
+  const provider = new MockMarketDataProvider();
+  const results = await provider.getQuotes(["TCS", "INFY"], {
+    failSymbols: ["INFY"],
+  });
+
+  const tcs = results.find((r) => r.symbol === "TCS");
+  const infy = results.find((r) => r.symbol === "INFY");
+
+  assert.ok(tcs?.found);
+  assert.equal(infy?.found, false);
+});
+
+test("failSymbols does not affect symbols not named in the list", async () => {
+  const provider = new MockMarketDataProvider();
+  const withoutFailure = await provider.getQuotes(["TCS"]);
+  const withUnrelatedFailure = await provider.getQuotes(["TCS"], {
+    failSymbols: ["INFY"],
+  });
+
+  assert.ok(withoutFailure[0].found && withUnrelatedFailure[0].found);
+  if (!withoutFailure[0].found || !withUnrelatedFailure[0].found) return;
+  assert.equal(withoutFailure[0].quote.lastPrice, withUnrelatedFailure[0].quote.lastPrice);
+});
+
+test("a found quote exposes a valid, recent asOf timestamp", async () => {
+  const provider = new MockMarketDataProvider();
+  const before = Date.now();
+  const [result] = await provider.getQuotes(["TCS"]);
+  const after = Date.now();
+
+  assert.ok(result.found);
+  if (!result.found) return;
+
+  const asOfMs = new Date(result.quote.asOf).getTime();
+  assert.ok(!Number.isNaN(asOfMs), "asOf should be a valid ISO timestamp");
+  assert.ok(asOfMs >= before && asOfMs <= after);
+});

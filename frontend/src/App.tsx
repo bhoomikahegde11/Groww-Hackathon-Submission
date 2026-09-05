@@ -22,10 +22,24 @@ function formatVolume(n: number): string {
   return n.toLocaleString('en-IN')
 }
 
-function QuoteDetails({ result }: { result: QuoteResult | undefined }) {
-  if (!result) return <p className="quote-status">Loading market data…</p>
+function formatAsOf(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+// The primary, right-aligned market data for a stock: price + change.
+// Rendered in a fixed position next to the identity regardless of whether
+// a quote is loading, missing, or present, so every row's right column
+// stays aligned.
+function PriceBlock({ result }: { result: QuoteResult | undefined }) {
+  if (!result) {
+    return <span className="price-pending">Loading…</span>
+  }
   if (!result.found) {
-    return <p className="quote-status">No simulated market data for this symbol.</p>
+    return <span className="price-pending">No data</span>
   }
 
   const { quote } = result
@@ -34,19 +48,33 @@ function QuoteDetails({ result }: { result: QuoteResult | undefined }) {
   const isUp = change >= 0
 
   return (
-    <div className="quote">
-      <div className="quote-main">
-        <span className="price">₹{formatNumber(quote.lastPrice)}</span>
-        <span className={isUp ? 'change up' : 'change down'}>
-          {isUp ? '▲' : '▼'} {formatNumber(Math.abs(change))} (
-          {isUp ? '+' : ''}
-          {changePct.toFixed(2)}%)
-        </span>
-      </div>
-      <div className="quote-details">
-        <span>Day range: ₹{formatNumber(quote.dayLow)} – ₹{formatNumber(quote.dayHigh)}</span>
-        <span>Volume: {formatVolume(quote.volume)}</span>
-      </div>
+    <div className="price-block">
+      <span className="price">₹{formatNumber(quote.lastPrice)}</span>
+      <span className={isUp ? 'change up' : 'change down'}>
+        {isUp ? '▲' : '▼'} {formatNumber(Math.abs(change))} (
+        {isUp ? '+' : ''}
+        {changePct.toFixed(2)}%)
+      </span>
+    </div>
+  )
+}
+
+// Secondary market data: day range, volume, freshness — or a loading/
+// unavailable message when there's no quote to show it for.
+function SecondaryInfo({ result }: { result: QuoteResult | undefined }) {
+  if (!result) {
+    return <span className="quote-status">Loading market data…</span>
+  }
+  if (!result.found) {
+    return <span className="quote-status">No simulated market data for this symbol.</span>
+  }
+
+  const { quote } = result
+  return (
+    <div className="quote-details">
+      <span>Day range: ₹{formatNumber(quote.dayLow)} – ₹{formatNumber(quote.dayHigh)}</span>
+      <span>Volume: {formatVolume(quote.volume)}</span>
+      <span className="quote-freshness">Updated {formatAsOf(quote.asOf)}</span>
     </div>
   )
 }
@@ -171,7 +199,7 @@ function App() {
       {formError && <p className="error">{formError}</p>}
 
       {loading ? (
-        <p>Loading watchlist…</p>
+        <p className="loading">Loading watchlist…</p>
       ) : loadError ? (
         <p className="error">Could not load watchlist: {loadError}</p>
       ) : items.length === 0 ? (
@@ -182,12 +210,16 @@ function App() {
             const result = quotes[item.symbol]
             const name = result?.found ? result.quote.name : null
             return (
-              <li key={item.id}>
-                <div className="row">
+              <li key={item.id} className="stock-row">
+                <div className="stock-row-top">
                   <div className="identity">
                     <span className="symbol">{item.symbol}</span>
                     {name && <span className="company-name">{name}</span>}
                   </div>
+                  <PriceBlock result={result} />
+                </div>
+                <div className="stock-row-bottom">
+                  <SecondaryInfo result={result} />
                   <button
                     type="button"
                     className="remove"
@@ -197,7 +229,6 @@ function App() {
                     {removingSymbol === item.symbol ? 'Removing…' : 'Remove'}
                   </button>
                 </div>
-                <QuoteDetails result={result} />
               </li>
             )
           })}

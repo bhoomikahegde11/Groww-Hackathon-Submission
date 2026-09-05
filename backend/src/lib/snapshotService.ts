@@ -59,7 +59,20 @@ async function fetchQuoteMap(
   symbols: string[],
   options?: MarketDataQueryOptions,
 ): Promise<Map<string, Quote>> {
-  const results = await marketDataProvider.getQuotes(symbols, options);
+  let results;
+  try {
+    results = await marketDataProvider.getQuotes(symbols, options);
+  } catch {
+    // The provider is completely unavailable this call — treat every
+    // symbol as missing rather than throwing. Everything downstream
+    // (initializeMissingBaselines, comparisonInputs, currentItemsPayload)
+    // already treats a symbol absent from this map as "no current data":
+    // no baseline is initialized/advanced for it and no change is flagged,
+    // so an empty map here safely degrades a total outage the same way a
+    // single missing symbol is already handled.
+    return new Map();
+  }
+
   const map = new Map<string, Quote>();
   for (const result of results) {
     if (result.found) map.set(result.symbol, result.quote);

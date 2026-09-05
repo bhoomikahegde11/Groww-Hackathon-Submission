@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { prisma } from "./prisma";
-import { getSnapshotView } from "./snapshotService";
+import { acknowledgeSnapshot, getSnapshotView } from "./snapshotService";
 
 // These tests run against the app's real configured database, but only
 // ever touch rows under a uniquely-named test user/watchlist that this
@@ -92,4 +92,94 @@ test("snapshot with an unsupported symbol under a scenario override does not cra
 
   // No quote data available for this symbol -> no changes surfaced, no crash.
   assert.ok(view.kind === "no-changes" || view.kind === "first-visit");
+});
+
+test("a complete provider failure does not crash and does not advance an existing baseline", async (t) => {
+  await setupIsolatedWatchlist();
+  t.after(teardownIsolatedWatchlist);
+
+  const baseline = {
+    lastSeenPrice: 3850,
+    lastSeenVolume: 2_500_000,
+    lastSeenWeekHigh52: 4260,
+    lastSeenWeekLow52: 3550,
+    lastSeenAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+  };
+
+  await prisma.watchlistItem.create({
+    data: { watchlistId: TEST_WATCHLIST_ID, symbol: "TCS", ...baseline },
+  });
+
+  const view = await getSnapshotView(TEST_WATCHLIST_ID, {
+    simulateProviderFailure: true,
+  });
+
+  // No current data was obtainable for anything -> no false change, no crash.
+  assert.equal(view.kind, "no-changes");
+
+  const item = await prisma.watchlistItem.findFirst({
+    where: { watchlistId: TEST_WATCHLIST_ID, symbol: "TCS" },
+  });
+  assert.equal(item?.lastSeenPrice, baseline.lastSeenPrice);
+  assert.equal(item?.lastSeenVolume, baseline.lastSeenVolume);
+  assert.equal(item?.lastSeenAt?.getTime(), baseline.lastSeenAt.getTime());
+});
+
+test("a partial quote failure still detects changes for the successful symbol and leaves the failed symbol's baseline untouched", async (t) => {
+  await setupIsolatedWatchlist();
+  t.after(teardownIsolatedWatchlist);
+
+  const tcsBaseline = {
+    lastSeenPrice: 3850,
+    lastSeenVolume: 2_500_000,
+    lastSeenWeekHigh52: 4260,
+    lastSeenWeekLow52: 3550,
+    lastSeenAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+  };
+  const infyBaseline = {
+    lastSeenPrice: 1550,
+    lastSeenVolume: 6_000_000,
+    lastSeenWeekHigh52: 1770,
+    lastSeenWeekLow52: 1350,
+    lastSeenAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+  };
+
+  await prisma.watchlistItem.create({
+    data: { watchlistId: TEST_WATCHLIST_ID, symbol: "TCS", ...tcsBaseline },
+  });
+  await prisma.watchlistItem.create({
+    data: { watchlistId: TEST_WATCHLIST_ID, symbol: "INFY", ...infyBaseline },
+  });
+
+  const view = await getSnapshotView(TEST_WATCHLIST_ID, {
+    scenario: "significant-move",
+    failSymbols: ["INFY"],
+  });
+
+  // Only TCS (the successful symbol) is surfaced — INFY's failed quote must
+  // not be treated as a change, and must not crash the whole comparison.
+  assert.equal(view.kind, "while-you-were-away");
+  if (view.kind !== "while-you-were-away") return;
+  assert.equal(view.changes.length, 1);
+  assert.equal(view.changes[0].symbol, "TCS");
+
+  await acknowledgeSnapshot(TEST_WATCHLIST_ID);
+
+  const tcsAfter = await prisma.watchlistItem.findFirst({
+    where: { watchlistId: TEST_WATCHLIST_ID, symbol: "TCS" },
+  });
+  const infyAfter = await prisma.watchlistItem.findFirst({
+    where: { watchlistId: TEST_WATCHLIST_ID, symbol: "INFY" },
+  });
+
+  // TCS's baseline advances to the new (real) quote values.
+  assert.notEqual(tcsAfter?.lastSeenPrice, tcsBaseline.lastSeenPrice);
+
+  // INFY's baseline is completely untouched — its quote failed, so it must
+  // not be advanced using missing/invalid data.
+  assert.equal(infyAfter?.lastSeenPrice, infyBaseline.lastSeenPrice);
+  assert.equal(infyAfter?.lastSeenVolume, infyBaseline.lastSeenVolume);
+  assert.equal(infyAfter?.lastSeenWeekHigh52, infyBaseline.lastSeenWeekHigh52);
+  assert.equal(infyAfter?.lastSeenWeekLow52, infyBaseline.lastSeenWeekLow52);
+  assert.equal(infyAfter?.lastSeenAt?.getTime(), infyBaseline.lastSeenAt.getTime());
 });
