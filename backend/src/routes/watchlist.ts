@@ -1,10 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler";
-import { getDefaultWatchlist } from "../lib/defaultWatchlist";
 import { prisma } from "../lib/prisma";
+import { requireAuth } from "../lib/requireAuth";
+import { getOrCreateWatchlistForUser } from "../lib/userWatchlist";
 
 export const watchlistRouter = Router();
+
+watchlistRouter.use(requireAuth);
 
 const SYMBOL_PATTERN = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
@@ -17,8 +20,8 @@ function normalizeSymbol(raw: unknown): string | null {
 
 watchlistRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
-    const watchlist = await getDefaultWatchlist();
+  asyncHandler(async (req, res) => {
+    const watchlist = await getOrCreateWatchlistForUser(req.userId!);
     const items = await prisma.watchlistItem.findMany({
       where: { watchlistId: watchlist.id },
       orderBy: { addedAt: "asc" },
@@ -39,7 +42,7 @@ watchlistRouter.post(
       return;
     }
 
-    const watchlist = await getDefaultWatchlist();
+    const watchlist = await getOrCreateWatchlistForUser(req.userId!);
 
     try {
       const item = await prisma.watchlistItem.create({
@@ -68,7 +71,7 @@ watchlistRouter.delete(
       return;
     }
 
-    const watchlist = await getDefaultWatchlist();
+    const watchlist = await getOrCreateWatchlistForUser(req.userId!);
 
     const deleted = await prisma.watchlistItem.deleteMany({
       where: { watchlistId: watchlist.id, symbol },

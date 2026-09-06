@@ -12,7 +12,12 @@ const TEST_WATCHLIST_ID = "test-watchlist-snapshot-scenario";
 
 async function setupIsolatedWatchlist() {
   await prisma.user.create({
-    data: { id: TEST_USER_ID, name: "Snapshot Scenario Test User" },
+    data: {
+      id: TEST_USER_ID,
+      email: `${TEST_USER_ID}@example.test`,
+      passwordHash: "unused-in-these-tests",
+      name: "Snapshot Scenario Test User",
+    },
   });
   await prisma.watchlist.create({
     data: {

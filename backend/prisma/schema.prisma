@@ -1,5 +1,4 @@
 // Prisma schema for the Smart Market Watchlist backend.
-// No authentication yet: User exists as a placeholder owner for watchlists.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,10 +10,14 @@ datasource db {
 }
 
 model User {
-  id         String      @id @default(cuid())
-  name       String
-  createdAt  DateTime    @default(now())
-  watchlists Watchlist[]
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  // Not collected at signup (email/password only); kept optional and
+  // unused by app logic so the pre-auth demo user's name is preserved.
+  name         String?
+  createdAt    DateTime    @default(now())
+  watchlists   Watchlist[]
 }
 
 model Watchlist {

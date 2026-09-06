@@ -3,14 +3,18 @@ import './App.css'
 import {
   acknowledgeSnapshot,
   addWatchlistItem,
+  fetchCurrentUser,
   fetchQuotes,
   fetchSnapshot,
   fetchWatchlist,
+  logout,
   removeWatchlistItem,
+  type AuthUser,
   type QuoteResult,
   type SnapshotView,
   type WatchlistItem,
 } from './api'
+import { AuthScreen } from './AuthScreen'
 import { DevScenarioPreview } from './DevScenarioPreview'
 import { WhileYouWereAway } from './WhileYouWereAway'
 
@@ -80,6 +84,9 @@ function SecondaryInfo({ result }: { result: QuoteResult | undefined }) {
 }
 
 function App() {
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+
   const [items, setItems] = useState<WatchlistItem[]>([])
   const [quotes, setQuotes] = useState<Record<string, QuoteResult>>({})
   const [snapshot, setSnapshot] = useState<SnapshotView | null>(null)
@@ -110,6 +117,19 @@ function App() {
     }
   }
 
+  async function loadWatchlistData() {
+    setLoading(true)
+    try {
+      const watchlist = await fetchWatchlist()
+      setItems(watchlist.items)
+      await Promise.all([refreshQuotes(), refreshSnapshot()])
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load watchlist')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleAcknowledge() {
     try {
       await acknowledgeSnapshot()
@@ -127,14 +147,37 @@ function App() {
   }
 
   useEffect(() => {
-    fetchWatchlist()
-      .then((watchlist) => {
-        setItems(watchlist.items)
-        return Promise.all([refreshQuotes(), refreshSnapshot()])
+    fetchCurrentUser()
+      .then(async (currentUser) => {
+        setUser(currentUser)
+        if (currentUser) {
+          await loadWatchlistData()
+        }
       })
-      .catch((err) => setLoadError(err.message))
-      .finally(() => setLoading(false))
+      .catch(() => {
+        // Not authenticated / backend unreachable — show the login screen.
+      })
+      .finally(() => setAuthChecked(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  function handleAuthenticated(authedUser: AuthUser) {
+    setUser(authedUser)
+    void loadWatchlistData()
+  }
+
+  async function handleLogout() {
+    try {
+      await logout()
+    } finally {
+      setUser(null)
+      setItems([])
+      setQuotes({})
+      setSnapshot(null)
+      setFormError(null)
+      setSymbolInput('')
+    }
+  }
 
   async function handleAdd(event: FormEvent) {
     event.preventDefault()
@@ -172,12 +215,30 @@ function App() {
     }
   }
 
+  if (!authChecked) {
+    return <main className="app" />
+  }
+
+  if (!user) {
+    return <AuthScreen onAuthenticated={handleAuthenticated} />
+  }
+
   return (
     <main className="app">
-      <h1>Smart Market Watchlist</h1>
-      <p className="disclaimer">
-        Market data shown is simulated for demo purposes — not real prices.
-      </p>
+      <div className="app-header">
+        <div>
+          <h1>Smart Market Watchlist</h1>
+          <p className="disclaimer">
+            Market data shown is simulated for demo purposes — not real prices.
+          </p>
+        </div>
+        <div className="account-bar">
+          <span className="account-email">{user.email}</span>
+          <button type="button" className="logout-button" onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
+      </div>
 
       {snapshot && (
         <WhileYouWereAway snapshot={snapshot} onAcknowledge={handleAcknowledge} />

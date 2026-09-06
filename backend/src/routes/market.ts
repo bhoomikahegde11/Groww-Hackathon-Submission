@@ -1,13 +1,16 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler";
-import { getDefaultWatchlist } from "../lib/defaultWatchlist";
 import { prisma } from "../lib/prisma";
+import { requireAuth } from "../lib/requireAuth";
 import { getSnapshotPreview } from "../lib/snapshotPreview";
 import { acknowledgeSnapshot, getSnapshotView } from "../lib/snapshotService";
+import { getOrCreateWatchlistForUser } from "../lib/userWatchlist";
 import { marketDataProvider } from "../marketData";
 import { parseScenarioParam } from "../marketData/scenarioParam";
 
 export const marketRouter = Router();
+
+marketRouter.use(requireAuth);
 
 marketRouter.get(
   "/quotes",
@@ -28,7 +31,7 @@ marketRouter.get(
         ? failSymbolsParam.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
         : undefined;
 
-    const watchlist = await getDefaultWatchlist();
+    const watchlist = await getOrCreateWatchlistForUser(req.userId!);
     const items = await prisma.watchlistItem.findMany({
       where: { watchlistId: watchlist.id },
       orderBy: { addedAt: "asc" },
@@ -64,7 +67,7 @@ marketRouter.get(
       return;
     }
 
-    const watchlist = await getDefaultWatchlist();
+    const watchlist = await getOrCreateWatchlistForUser(req.userId!);
     const view = await getSnapshotView(watchlist.id, {
       scenario: parsedScenario.scenario,
     });
@@ -85,7 +88,7 @@ marketRouter.get(
       return;
     }
 
-    const watchlist = await getDefaultWatchlist();
+    const watchlist = await getOrCreateWatchlistForUser(req.userId!);
     const changes = await getSnapshotPreview(watchlist.id, {
       scenario: parsedScenario.scenario,
     });
@@ -95,8 +98,8 @@ marketRouter.get(
 
 marketRouter.post(
   "/snapshot/ack",
-  asyncHandler(async (_req, res) => {
-    const watchlist = await getDefaultWatchlist();
+  asyncHandler(async (req, res) => {
+    const watchlist = await getOrCreateWatchlistForUser(req.userId!);
     const acknowledged = await acknowledgeSnapshot(watchlist.id);
     res.json({ acknowledged });
   }),
