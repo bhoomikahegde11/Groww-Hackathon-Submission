@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import './App.css'
 import {
   acknowledgeSnapshot,
@@ -63,6 +63,68 @@ function PriceBlock({ result }: { result: QuoteResult | undefined }) {
   )
 }
 
+type SortOption =
+  | 'default'
+  | 'price-desc'
+  | 'price-asc'
+  | 'change-desc'
+  | 'change-asc'
+  | 'volume-desc'
+  | 'volume-asc'
+  | 'symbol-asc'
+
+type FilterOption = 'all' | 'gainers' | 'losers' | 'unchanged'
+
+const SORT_LABELS: Record<SortOption, string> = {
+  default: 'Default order',
+  'price-desc': 'Price: High to low',
+  'price-asc': 'Price: Low to high',
+  'change-desc': '% Change: High to low',
+  'change-asc': '% Change: Low to high',
+  'volume-desc': 'Volume: High to low',
+  'volume-asc': 'Volume: Low to high',
+  'symbol-asc': 'Symbol: A to Z',
+}
+
+const FILTER_LABELS: Record<FilterOption, string> = {
+  all: 'All',
+  gainers: 'Gainers',
+  losers: 'Losers',
+  unchanged: 'Unchanged',
+}
+
+interface DisplayItem {
+  item: WatchlistItem
+  index: number
+  result: QuoteResult | undefined
+  changePercent: number | null
+}
+
+/** null when there's no quote to compute a % change from (loading/missing symbol). */
+function computeChangePercent(result: QuoteResult | undefined): number | null {
+  if (!result?.found) return null
+  const { quote } = result
+  return ((quote.lastPrice - quote.previousClose) / quote.previousClose) * 100
+}
+
+/** The numeric value a given sort option ranks by, or null if unavailable for this row. */
+function sortMetric(sort: SortOption, d: DisplayItem): number | null {
+  if (!d.result?.found) return null
+  switch (sort) {
+    case 'price-desc':
+    case 'price-asc':
+      return d.result.quote.lastPrice
+    case 'change-desc':
+    case 'change-asc':
+      return d.changePercent
+    case 'volume-desc':
+    case 'volume-asc':
+      return d.result.quote.volume
+    default:
+      return null
+  }
+}
+
 // Secondary market data: day range, volume, freshness — or a loading/
 // unavailable message when there's no quote to show it for.
 function SecondaryInfo({ result }: { result: QuoteResult | undefined }) {
@@ -97,6 +159,56 @@ function App() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [removingSymbol, setRemovingSymbol] = useState<string | null>(null)
+
+  const [sortOption, setSortOption] = useState<SortOption>('default')
+  const [filterOption, setFilterOption] = useState<FilterOption>('all')
+
+  const visibleItems = useMemo<DisplayItem[]>(() => {
+    const decorated: DisplayItem[] = items.map((item, index) => {
+      const result = quotes[item.symbol]
+      return { item, index, result, changePercent: computeChangePercent(result) }
+    })
+
+    const filtered = decorated.filter((d) => {
+      switch (filterOption) {
+        case 'gainers':
+          return d.changePercent !== null && d.changePercent > 0
+        case 'losers':
+          return d.changePercent !== null && d.changePercent < 0
+        case 'unchanged':
+          return d.changePercent !== null && d.changePercent === 0
+        case 'all':
+        default:
+          return true
+      }
+    })
+
+    // Default preserves the watchlist's own order exactly — no rearranging.
+    if (sortOption === 'default') {
+      return [...filtered].sort((a, b) => a.index - b.index)
+    }
+
+    // Symbol sort works for every row regardless of quote availability.
+    if (sortOption === 'symbol-asc') {
+      return [...filtered].sort((a, b) => a.item.symbol.localeCompare(b.item.symbol))
+    }
+
+    // Price/change/volume sorts need quote data — rows without it can't be
+    // ranked, so they stay visible but sink to the bottom instead of
+    // disappearing or breaking the sort.
+    const rankable = filtered.filter((d) => sortMetric(sortOption, d) !== null)
+    const unrankable = filtered
+      .filter((d) => sortMetric(sortOption, d) === null)
+      .sort((a, b) => a.index - b.index)
+
+    const ascending = sortOption.endsWith('-asc')
+    rankable.sort((a, b) => {
+      const diff = (sortMetric(sortOption, a) as number) - (sortMetric(sortOption, b) as number)
+      return ascending ? diff : -diff
+    })
+
+    return [...rankable, ...unrankable]
+  }, [items, quotes, sortOption, filterOption])
 
   async function refreshQuotes() {
     try {
@@ -266,34 +378,69 @@ function App() {
       ) : items.length === 0 ? (
         <p className="empty">Your watchlist is empty. Add a symbol above.</p>
       ) : (
-        <ul className="watchlist">
-          {items.map((item) => {
-            const result = quotes[item.symbol]
-            const name = result?.found ? result.quote.name : null
-            return (
-              <li key={item.id} className="stock-row">
-                <div className="stock-row-top">
-                  <div className="identity">
-                    <span className="symbol">{item.symbol}</span>
-                    {name && <span className="company-name">{name}</span>}
-                  </div>
-                  <PriceBlock result={result} />
-                </div>
-                <div className="stock-row-bottom">
-                  <SecondaryInfo result={result} />
-                  <button
-                    type="button"
-                    className="remove"
-                    onClick={() => handleRemove(item.symbol)}
-                    disabled={removingSymbol === item.symbol}
-                  >
-                    {removingSymbol === item.symbol ? 'Removing…' : 'Remove'}
-                  </button>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <>
+          <div className="list-controls">
+            <label className="sort-control">
+              Sort
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
+              >
+                {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
+                  <option key={option} value={option}>
+                    {SORT_LABELS[option]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="filter-control" role="group" aria-label="Filter watchlist">
+              {(Object.keys(FILTER_LABELS) as FilterOption[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={
+                    filterOption === option ? 'filter-chip active' : 'filter-chip'
+                  }
+                  onClick={() => setFilterOption(option)}
+                >
+                  {FILTER_LABELS[option]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {visibleItems.length === 0 ? (
+            <p className="empty">No stocks match this filter.</p>
+          ) : (
+            <ul className="watchlist">
+              {visibleItems.map(({ item, result }) => {
+                const name = result?.found ? result.quote.name : null
+                return (
+                  <li key={item.id} className="stock-row">
+                    <div className="stock-row-top">
+                      <div className="identity">
+                        <span className="symbol">{item.symbol}</span>
+                        {name && <span className="company-name">{name}</span>}
+                      </div>
+                      <PriceBlock result={result} />
+                    </div>
+                    <div className="stock-row-bottom">
+                      <SecondaryInfo result={result} />
+                      <button
+                        type="button"
+                        className="remove"
+                        onClick={() => handleRemove(item.symbol)}
+                        disabled={removingSymbol === item.symbol}
+                      >
+                        {removingSymbol === item.symbol ? 'Removing…' : 'Remove'}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
       )}
 
       {import.meta.env.DEV && <DevScenarioPreview />}
