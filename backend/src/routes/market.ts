@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/requireAuth";
 import { getSnapshotPreview } from "../lib/snapshotPreview";
 import { acknowledgeSnapshot, getSnapshotView } from "../lib/snapshotService";
+import { normalizeSymbol } from "../lib/symbol";
 import { getOrCreateWatchlistForUser } from "../lib/userWatchlist";
 import { marketDataProvider } from "../marketData";
 import { parseScenarioParam } from "../marketData/scenarioParam";
@@ -55,6 +56,31 @@ marketRouter.get(
     }
 
     res.json({ quotes });
+  }),
+);
+
+// Read-only ~30-day daily-close history for one symbol, independent of the
+// watchlist/snapshot/last-seen machinery entirely — it doesn't touch the
+// database at all.
+marketRouter.get(
+  "/history",
+  asyncHandler(async (req, res) => {
+    const symbol = normalizeSymbol(req.query.symbol);
+    if (!symbol) {
+      res.status(400).json({
+        error:
+          "Invalid symbol. Use 1-10 characters: letters, numbers, '.' or '-', starting with a letter.",
+      });
+      return;
+    }
+
+    const history = await marketDataProvider.getHistory(symbol);
+    if (!history.found) {
+      res.status(404).json({ error: `No historical data for ${symbol}.` });
+      return;
+    }
+
+    res.json(history);
   }),
 );
 

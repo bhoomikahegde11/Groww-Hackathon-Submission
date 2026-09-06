@@ -3,20 +3,12 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../lib/requireAuth";
+import { normalizeSymbol } from "../lib/symbol";
 import { getOrCreateWatchlistForUser } from "../lib/userWatchlist";
 
 export const watchlistRouter = Router();
 
 watchlistRouter.use(requireAuth);
-
-const SYMBOL_PATTERN = /^[A-Z][A-Z0-9.-]{0,9}$/;
-
-function normalizeSymbol(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  const symbol = raw.trim().toUpperCase();
-  if (!SYMBOL_PATTERN.test(symbol)) return null;
-  return symbol;
-}
 
 watchlistRouter.get(
   "/",

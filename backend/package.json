@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/marketData/changeDetection.test.ts src/marketData/scenarioParam.test.ts src/marketData/mockProvider.test.ts src/marketData/attentionScoring.test.ts src/lib/snapshotService.test.ts src/routes/auth.test.ts",
+    "test": "tsx --test src/marketData/changeDetection.test.ts src/marketData/scenarioParam.test.ts src/marketData/mockProvider.test.ts src/marketData/attentionScoring.test.ts src/marketData/history.test.ts src/lib/snapshotService.test.ts src/routes/auth.test.ts src/routes/market.history.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"

@@ -120,6 +120,29 @@ export async function fetchQuotes(): Promise<QuoteResult[]> {
   return body.quotes
 }
 
+export type HistoryPoint = {
+  date: string
+  close: number
+}
+
+export type HistoryFetchResult =
+  | { found: true; points: HistoryPoint[] }
+  | { found: false }
+
+// Fetches ~30 days of daily closes for one symbol, lazily (only call this
+// when a user actually opens a chart). A 404 (unsupported symbol) resolves
+// to { found: false } rather than throwing, since it's an expected state.
+export async function fetchHistory(symbol: string): Promise<HistoryFetchResult> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/market/history?symbol=${encodeURIComponent(symbol)}`,
+    WITH_CREDENTIALS,
+  )
+  if (res.status === 404) return { found: false }
+  if (!res.ok) throw new Error(await parseErrorMessage(res))
+  const body = await res.json()
+  return { found: true, points: body.points }
+}
+
 export type SnapshotChange = {
   symbol: string
   name: string

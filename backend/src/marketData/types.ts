@@ -19,6 +19,16 @@ export type QuoteResult =
   | { symbol: string; found: true; quote: Quote }
   | { symbol: string; found: false };
 
+export interface HistoryPoint {
+  /** ISO date (YYYY-MM-DD), oldest first. */
+  date: string;
+  close: number;
+}
+
+export type HistoryResult =
+  | { symbol: string; found: true; points: HistoryPoint[] }
+  | { symbol: string; found: false };
+
 export interface MarketDataQueryOptions {
   /**
    * Overrides each requested symbol's default scenario for this call.
@@ -53,4 +63,6 @@ export interface MarketDataProvider {
     symbols: string[],
     options?: MarketDataQueryOptions,
   ): Promise<QuoteResult[]>;
+  /** Roughly the last 30 days of daily closes for one symbol. */
+  getHistory(symbol: string): Promise<HistoryResult>;
 }

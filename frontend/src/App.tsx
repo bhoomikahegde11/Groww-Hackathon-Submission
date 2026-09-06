@@ -16,6 +16,7 @@ import {
 } from './api'
 import { AuthScreen } from './AuthScreen'
 import { DevScenarioPreview } from './DevScenarioPreview'
+import { PriceHistoryChart } from './PriceHistoryChart'
 import { WhileYouWereAway } from './WhileYouWereAway'
 
 function formatNumber(n: number): string {
@@ -162,6 +163,16 @@ function App() {
 
   const [sortOption, setSortOption] = useState<SortOption>('default')
   const [filterOption, setFilterOption] = useState<FilterOption>('all')
+  const [expandedCharts, setExpandedCharts] = useState<Set<string>>(new Set())
+
+  function toggleChart(symbol: string) {
+    setExpandedCharts((prev) => {
+      const next = new Set(prev)
+      if (next.has(symbol)) next.delete(symbol)
+      else next.add(symbol)
+      return next
+    })
+  }
 
   const visibleItems = useMemo<DisplayItem[]>(() => {
     const decorated: DisplayItem[] = items.map((item, index) => {
@@ -320,6 +331,12 @@ function App() {
         delete next[symbol]
         return next
       })
+      setExpandedCharts((prev) => {
+        if (!prev.has(symbol)) return prev
+        const next = new Set(prev)
+        next.delete(symbol)
+        return next
+      })
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to remove symbol')
     } finally {
@@ -435,6 +452,16 @@ function App() {
                         {removingSymbol === item.symbol ? 'Removing…' : 'Remove'}
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      className="chart-toggle"
+                      onClick={() => toggleChart(item.symbol)}
+                    >
+                      {expandedCharts.has(item.symbol) ? 'Hide chart' : 'View chart'}
+                    </button>
+                    {expandedCharts.has(item.symbol) && (
+                      <PriceHistoryChart symbol={item.symbol} />
+                    )}
                   </li>
                 )
               })}

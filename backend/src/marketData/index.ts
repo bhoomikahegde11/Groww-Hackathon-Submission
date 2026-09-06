@@ -7,6 +7,8 @@ import type { MarketDataProvider } from "./types";
 export const marketDataProvider: MarketDataProvider = new MockMarketDataProvider();
 
 export type {
+  HistoryPoint,
+  HistoryResult,
   MarketDataProvider,
   MarketDataQueryOptions,
   Quote,
